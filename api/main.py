@@ -1,4 +1,4 @@
-"""FastAPI application for Gold Sentiment Index."""
+"""FastAPI application for Commodity Sentiment Index."""
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.routers import sentiment
 from storage.db import init_db
 
-app = FastAPI(title="Gold Sentiment Index API", version="1.0.0")
+app = FastAPI(title="Commodity Sentiment Index API", version="2.0.0")
 
 
 @app.on_event("startup")
@@ -30,7 +30,7 @@ app.include_router(sentiment.router, prefix="/api")
 
 @app.get("/")
 def root():
-    return {"status": "ok", "service": "gold-sentiment-index"}
+    return {"status": "ok", "service": "commodity-sentiment-index"}
 
 
 @app.get("/api/health")

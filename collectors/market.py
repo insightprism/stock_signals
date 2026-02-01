@@ -8,7 +8,6 @@ import pandas as pd
 import yfinance as yf
 
 from collectors.base import BaseCollector
-from config.drivers import GOLD_FUTURES_TICKER, YFINANCE_TICKERS
 
 logger = logging.getLogger(__name__)
 
@@ -40,12 +39,14 @@ class MarketCollector(BaseCollector):
         start = end - timedelta(days=lookback_days)
         return self._fetch_ticker(symbol, start, end)
 
-    def collect(self, target_date: date, drivers: Optional[List[str]] = None
+    def collect(self, target_date: date, asset_config: dict,
+                drivers: Optional[List[str]] = None
                 ) -> Dict[str, List[dict]]:
         results: Dict[str, List[dict]] = {}
         start = target_date - timedelta(days=7)
+        yfinance_tickers = asset_config.get("yfinance_tickers", {})
 
-        for driver, ticker_map in YFINANCE_TICKERS.items():
+        for driver, ticker_map in yfinance_tickers.items():
             if drivers and driver not in drivers:
                 continue
             signals = []
@@ -96,19 +97,26 @@ class MarketCollector(BaseCollector):
 
         return results
 
-    def get_gold_price(self, target_date: date) -> Optional[float]:
-        """Get gold futures closing price for the given date."""
-        df = self._fetch_ticker(GOLD_FUTURES_TICKER,
+    def get_asset_price(self, target_date: date, asset_config: dict) -> Optional[float]:
+        """Get futures closing price for the asset."""
+        ticker = asset_config.get("futures_ticker", "")
+        if not ticker:
+            return None
+        df = self._fetch_ticker(ticker,
                                  target_date - timedelta(days=7),
                                  target_date)
         if df is not None and not df.empty:
             return float(df.iloc[-1]["Close"])
         return None
 
-    def get_gold_return(self, target_date: date, days: int = 1) -> Optional[float]:
-        """Get gold return over the specified number of days."""
+    def get_asset_return(self, target_date: date, asset_config: dict,
+                         days: int = 1) -> Optional[float]:
+        """Get asset return over the specified number of days."""
+        ticker = asset_config.get("futures_ticker", "")
+        if not ticker:
+            return None
         start = target_date - timedelta(days=days + 10)
-        df = self._fetch_ticker(GOLD_FUTURES_TICKER, start, target_date)
+        df = self._fetch_ticker(ticker, start, target_date)
         if df is not None and len(df) >= 2:
             return float((df.iloc[-1]["Close"] / df.iloc[-2]["Close"]) - 1)
         return None

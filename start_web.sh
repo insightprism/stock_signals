@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Start the Gold Sentiment Index web dashboard (Backend + Frontend)
+# Start the Commodity Sentiment Index web dashboard (Backend + Frontend)
 
 BACKEND_PORT=${GSI_BACKEND_PORT:-22226}
 FRONTEND_PORT=${GSI_FRONTEND_PORT:-22265}
 
 echo "=========================================="
-echo "  Gold Sentiment Index Web Dashboard"
+echo "  Commodity Sentiment Index Web Dashboard"
 echo "=========================================="
 echo ""
 echo "Backend Port:  $BACKEND_PORT"
@@ -21,7 +21,7 @@ FRONTEND_PID=""
 
 cleanup() {
     echo ""
-    echo "Shutting down Gold Sentiment Index web..."
+    echo "Shutting down Commodity Sentiment Index web..."
 
     if [ -n "$BACKEND_PID" ]; then
         echo "Stopping backend (PID: $BACKEND_PID)..."

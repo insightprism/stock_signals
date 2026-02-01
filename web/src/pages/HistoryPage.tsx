@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { createChart, type IChartApi, type ISeriesApi, LineSeries, AreaSeries } from 'lightweight-charts';
 import { useCompositeHistory } from '../hooks/useSentimentData';
+import { useAsset } from '../context/AssetContext';
 
 type RangeKey = '30d' | '90d' | '180d' | '1y' | 'all';
 
@@ -13,16 +14,17 @@ function getStartDate(range: RangeKey): string | undefined {
 }
 
 export default function HistoryPage() {
+  const { selectedAsset, currentAssetName } = useAsset();
   const [range, setRange] = useState<RangeKey>('90d');
   const startDate = useMemo(() => getStartDate(range), [range]);
-  const { data, isLoading } = useCompositeHistory(startDate);
+  const { data, isLoading } = useCompositeHistory(selectedAsset, startDate);
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const compositeSeriesRef = useRef<ISeriesApi<'Area'> | null>(null);
   const sentimentSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const macroSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
-  const goldSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const priceSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
 
   // Create chart once
   useEffect(() => {
@@ -77,18 +79,18 @@ export default function HistoryPage() {
       lineStyle: 2,
     });
 
-    const goldSeries = chart.addSeries(LineSeries, {
+    const priceSeries = chart.addSeries(LineSeries, {
       color: '#eab308',
       lineWidth: 2,
       priceScaleId: 'left',
-      title: 'Gold $',
+      title: 'Price $',
     });
 
     chartRef.current = chart;
     compositeSeriesRef.current = compositeSeries;
     sentimentSeriesRef.current = sentimentSeries;
     macroSeriesRef.current = macroSeries;
-    goldSeriesRef.current = goldSeries;
+    priceSeriesRef.current = priceSeries;
 
     const handleResize = () => {
       if (chartContainerRef.current) {
@@ -123,17 +125,17 @@ export default function HistoryPage() {
       value: d.macro_layer,
     }));
 
-    const goldData = data
-      .filter(d => d.gold_price != null)
+    const priceData = data
+      .filter(d => d.asset_price != null)
       .map(d => ({
         time: d.date as string,
-        value: d.gold_price!,
+        value: d.asset_price!,
       }));
 
     compositeSeriesRef.current.setData(compositeData);
     sentimentSeriesRef.current?.setData(sentimentData);
     macroSeriesRef.current?.setData(macroData);
-    goldSeriesRef.current?.setData(goldData);
+    priceSeriesRef.current?.setData(priceData);
 
     chartRef.current?.timeScale().fitContent();
   }, [data]);
@@ -177,7 +179,7 @@ export default function HistoryPage() {
           <span className="w-3 h-3 rounded-full bg-purple-500" /> Macro Layer
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-full bg-yellow-500" /> Gold Price (left axis)
+          <span className="w-3 h-3 rounded-full bg-yellow-500" /> {currentAssetName} Price (left axis)
         </span>
       </div>
 

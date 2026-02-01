@@ -20,19 +20,18 @@ COT_HIST_URL = "https://www.cftc.gov/files/dea/history/deacom{year}.zip"
 class CotCollector(BaseCollector):
     name = "cot"
 
-    def _parse_cot_csv(self, text: str) -> Optional[pd.DataFrame]:
-        """Parse COT CSV text into a DataFrame filtered for gold."""
+    def _parse_cot_csv(self, text: str, commodity: str = "GOLD") -> Optional[pd.DataFrame]:
+        """Parse COT CSV text into a DataFrame filtered for a commodity."""
         try:
             from io import StringIO
             df = pd.read_csv(StringIO(text))
-            # Filter for gold futures
-            gold_mask = df["Market_and_Exchange_Names"].str.contains(
-                "GOLD", case=False, na=False
+            mask = df["Market_and_Exchange_Names"].str.contains(
+                commodity, case=False, na=False
             )
-            gold_df = df[gold_mask].copy()
-            if gold_df.empty:
+            filtered = df[mask].copy()
+            if filtered.empty:
                 return None
-            return gold_df
+            return filtered
         except Exception as e:
             logger.error("COT CSV parse error: %s", e)
             return None
@@ -63,15 +62,16 @@ class CotCollector(BaseCollector):
             logger.error("COT current report fetch failed: %s", e)
             return None
 
-    def _try_cot_reports_library(self, target_date: date) -> Optional[pd.DataFrame]:
+    def _try_cot_reports_library(self, target_date: date,
+                                  commodity: str = "GOLD") -> Optional[pd.DataFrame]:
         """Try using the cot-reports library as fallback."""
         try:
             import cot_reports as cot
             df = cot.cot_year(year=target_date.year, cot_report_type="legacy_fut")
-            gold_mask = df["Market and Exchange Names"].str.contains(
-                "GOLD", case=False, na=False
+            mask = df["Market and Exchange Names"].str.contains(
+                commodity, case=False, na=False
             )
-            return df[gold_mask].copy() if gold_mask.any() else None
+            return df[mask].copy() if mask.any() else None
         except ImportError:
             logger.info("cot-reports library not available")
             return None
@@ -79,9 +79,10 @@ class CotCollector(BaseCollector):
             logger.error("cot-reports library failed: %s", e)
             return None
 
-    def fetch_history(self, lookback_days: int = 365) -> Optional[pd.DataFrame]:
-        """Fetch historical COT data for gold and compute net speculative positions."""
-        df = self._try_cot_reports_library(date.today())
+    def fetch_history(self, lookback_days: int = 365,
+                      commodity: str = "GOLD") -> Optional[pd.DataFrame]:
+        """Fetch historical COT data and compute net speculative positions."""
+        df = self._try_cot_reports_library(date.today(), commodity)
         if df is None:
             df = self._fetch_current_report()
         if df is None:
@@ -114,19 +115,26 @@ class CotCollector(BaseCollector):
 
         return result
 
-    def collect(self, target_date: date, drivers: Optional[List[str]] = None
+    def collect(self, target_date: date, asset_config: dict,
+                drivers: Optional[List[str]] = None
                 ) -> Dict[str, List[dict]]:
         results: Dict[str, List[dict]] = {}
+        commodity = asset_config.get("cot_commodity", "GOLD")
 
         if drivers and "spec_positioning" not in drivers:
             return results
 
         # Try library first, fall back to direct download
-        gold_df = self._try_cot_reports_library(target_date)
-        if gold_df is None:
-            gold_df = self._fetch_current_report()
+        cot_df = self._try_cot_reports_library(target_date, commodity)
+        if cot_df is None:
+            cot_df = self._fetch_current_report()
+            if cot_df is not None:
+                # Re-filter for this commodity
+                mask = cot_df["Market_and_Exchange_Names"].str.contains(
+                    commodity, case=False, na=False)
+                cot_df = cot_df[mask]
 
-        if gold_df is None or gold_df.empty:
+        if cot_df is None or cot_df.empty:
             logger.warning("No COT data available")
             return results
 
@@ -138,10 +146,10 @@ class CotCollector(BaseCollector):
                 break
 
         if date_col:
-            gold_df[date_col] = pd.to_datetime(gold_df[date_col])
-            gold_df = gold_df.sort_values(date_col, ascending=False)
+            cot_df[date_col] = pd.to_datetime(cot_df[date_col])
+            cot_df = cot_df.sort_values(date_col, ascending=False)
 
-        latest = gold_df.iloc[0]
+        latest = cot_df.iloc[0]
         net_spec = self._compute_net_speculative(latest)
 
         report_date = str(latest[date_col].date()) if date_col else target_date.isoformat()
@@ -156,7 +164,8 @@ class CotCollector(BaseCollector):
             },
         }]
 
-        logger.info("COT net speculative (gold): %.0f as of %s",
+        logger.info("COT net speculative (%s): %.0f as of %s",
+                     commodity,
                      net_spec, report_date)
 
         return results

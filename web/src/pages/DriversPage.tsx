@@ -1,4 +1,5 @@
 import { useDriversLatest, useConfig } from '../hooks/useSentimentData';
+import { useAsset } from '../context/AssetContext';
 
 const DRIVER_LABELS: Record<string, string> = {
   monetary_policy: 'Monetary Policy',
@@ -15,7 +16,7 @@ const DRIVER_DESCRIPTIONS: Record<string, string> = {
   us_dollar: 'Dollar index strength/weakness (inverse relationship)',
   inflation_expect: 'Breakeven inflation rates and expectations',
   geopolitical_risk: 'Wars, sanctions, global conflicts',
-  investment_demand: 'Gold ETF flows, central bank buying',
+  investment_demand: 'ETF flows, central bank buying',
   spec_positioning: 'COMEX futures net managed money positioning',
   risk_appetite: 'VIX, equity markets, safe haven demand',
 };
@@ -55,8 +56,9 @@ function cardBorder(score: number): string {
 }
 
 export default function DriversPage() {
-  const { data: driversData, isLoading: drvLoading } = useDriversLatest();
-  const { data: config, isLoading: cfgLoading } = useConfig();
+  const { selectedAsset, currentAssetName } = useAsset();
+  const { data: driversData, isLoading: drvLoading } = useDriversLatest(selectedAsset);
+  const { data: config, isLoading: cfgLoading } = useConfig(selectedAsset);
 
   if (drvLoading || cfgLoading) {
     return (
@@ -75,7 +77,7 @@ export default function DriversPage() {
   if (drivers.length === 0) {
     return (
       <div className="text-center py-20 text-gray-500">
-        <p className="text-xl font-medium mb-2">No driver data available</p>
+        <p className="text-xl font-medium mb-2">No driver data available for {currentAssetName}</p>
         <p>Run the pipeline to generate driver scores.</p>
       </div>
     );

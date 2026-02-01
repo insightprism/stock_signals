@@ -5,7 +5,6 @@ from datetime import date
 from typing import Dict, List, Optional
 
 from collectors.base import BaseCollector
-from config.drivers import DRIVER_KEYWORDS
 from config.settings import ALPHA_VANTAGE_API_KEY, AV_BASE_URL
 
 logger = logging.getLogger(__name__)
@@ -33,8 +32,9 @@ class AlphaVantageCollector(BaseCollector):
         if topics:
             params["topics"] = topics
 
-        # Use tickers param for gold-related queries
-        params["tickers"] = "FOREX:XAU"
+        # Use tickers param for asset-specific queries
+        if self._av_ticker:
+            params["tickers"] = self._av_ticker
 
         try:
             resp = self._request(AV_BASE_URL, params=params)
@@ -76,19 +76,21 @@ class AlphaVantageCollector(BaseCollector):
         "investment_demand": "finance",
     }
 
-    def collect(self, target_date: date, drivers: Optional[List[str]] = None
+    def collect(self, target_date: date, asset_config: dict,
+                drivers: Optional[List[str]] = None
                 ) -> Dict[str, List[dict]]:
         results: Dict[str, List[dict]] = {}
 
         if not ALPHA_VANTAGE_API_KEY:
             return results
 
-        # Fetch once with gold ticker to minimize API calls (25/day limit)
+        self._av_ticker = asset_config.get("alphavantage_ticker", "FOREX:XAU")
         articles = self._fetch_news_sentiment([], topics="finance")
         if not articles:
             return results
 
-        for driver, keywords in DRIVER_KEYWORDS.items():
+        all_keywords = asset_config.get("keywords", {})
+        for driver, keywords in all_keywords.items():
             if drivers and driver not in drivers:
                 continue
             if driver == "spec_positioning":

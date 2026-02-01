@@ -5,12 +5,10 @@ from datetime import date, datetime, timezone
 from typing import Dict, List, Optional
 
 from collectors.base import BaseCollector
-from config.drivers import DRIVER_KEYWORDS
 from config.settings import (
     REDDIT_CLIENT_ID,
     REDDIT_CLIENT_SECRET,
     REDDIT_POST_LIMIT,
-    REDDIT_SUBREDDITS,
     REDDIT_USER_AGENT,
 )
 
@@ -87,7 +85,8 @@ class RedditCollector(BaseCollector):
                 matched.append(post)
         return matched
 
-    def collect(self, target_date: date, drivers: Optional[List[str]] = None
+    def collect(self, target_date: date, asset_config: dict,
+                drivers: Optional[List[str]] = None
                 ) -> Dict[str, List[dict]]:
         results: Dict[str, List[dict]] = {}
 
@@ -95,9 +94,9 @@ class RedditCollector(BaseCollector):
         if reddit is None:
             return results
 
-        # Collect posts from all configured subreddits
+        subreddits = asset_config.get("subreddits", [])
         all_posts = []
-        for sub_name in REDDIT_SUBREDDITS:
+        for sub_name in subreddits:
             posts = self._fetch_posts(sub_name)
             all_posts.extend(posts)
             logger.info("Reddit r/%s: fetched %d posts", sub_name, len(posts))
@@ -105,8 +104,8 @@ class RedditCollector(BaseCollector):
         if not all_posts:
             return results
 
-        # For each driver, filter posts by keywords and compute sentiment
-        for driver, keywords in DRIVER_KEYWORDS.items():
+        all_keywords = asset_config.get("keywords", {})
+        for driver, keywords in all_keywords.items():
             if drivers and driver not in drivers:
                 continue
             if driver == "spec_positioning":

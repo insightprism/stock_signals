@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Layout } from './components/Layout';
+import { AssetProvider } from './context/AssetContext';
 import { routes } from './config/routeConfig';
 
 function PageLoader() {
@@ -14,19 +15,21 @@ function PageLoader() {
 function App() {
   return (
     <BrowserRouter>
-      <Layout>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
-            {routes.map((route) => (
-              <Route
-                key={route.path}
-                path={route.path}
-                element={<route.component />}
-              />
-            ))}
-          </Routes>
-        </Suspense>
-      </Layout>
+      <AssetProvider>
+        <Layout>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              {routes.map((route) => (
+                <Route
+                  key={route.path}
+                  path={route.path}
+                  element={<route.component />}
+                />
+              ))}
+            </Routes>
+          </Suspense>
+        </Layout>
+      </AssetProvider>
     </BrowserRouter>
   );
 }

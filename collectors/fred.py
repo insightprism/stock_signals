@@ -7,7 +7,6 @@ from typing import Dict, List, Optional
 import pandas as pd
 
 from collectors.base import BaseCollector
-from config.drivers import FRED_SERIES
 from config.settings import FRED_API_KEY
 
 logger = logging.getLogger(__name__)
@@ -60,13 +59,14 @@ class FredCollector(BaseCollector):
         start = end - timedelta(days=lookback_days)
         return self._fetch_series(series_id, start, end)
 
-    def collect(self, target_date: date, drivers: Optional[List[str]] = None
+    def collect(self, target_date: date, asset_config: dict,
+                drivers: Optional[List[str]] = None
                 ) -> Dict[str, List[dict]]:
         results: Dict[str, List[dict]] = {}
-        # Look back a few days to handle weekends/holidays
         start = target_date - timedelta(days=7)
+        fred_series = asset_config.get("fred_series", {})
 
-        for driver, series_map in FRED_SERIES.items():
+        for driver, series_map in fred_series.items():
             if drivers and driver not in drivers:
                 continue
             signals = []

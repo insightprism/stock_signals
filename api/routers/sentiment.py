@@ -1,4 +1,4 @@
-"""API endpoints for gold sentiment index data."""
+"""API endpoints for commodity sentiment index data."""
 
 import json
 import sqlite3
@@ -8,8 +8,8 @@ from typing import Optional
 
 from fastapi import APIRouter, Query
 
-from config.settings import DB_PATH, DRIVER_WEIGHTS, LAYER_WEIGHTS
-from config.drivers import DRIVER_NAMES
+from config.settings import DB_PATH
+from config.asset_registry import get_asset_config, list_assets, get_asset_ids
 
 router = APIRouter()
 
@@ -27,13 +27,20 @@ def _rows_to_dicts(rows: list[sqlite3.Row]) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+@router.get("/assets")
+def assets_list():
+    """List all available assets."""
+    return {"data": list_assets()}
+
+
 @router.get("/composite/latest")
-def composite_latest():
+def composite_latest(asset: str = Query("gold")):
     """Latest day's composite score with full breakdown."""
     conn = _get_conn()
     try:
         row = conn.execute(
-            "SELECT * FROM daily_composite ORDER BY date DESC LIMIT 1"
+            "SELECT * FROM daily_composite WHERE asset = ? ORDER BY date DESC LIMIT 1",
+            (asset,),
         ).fetchone()
         if not row:
             return {"data": None}
@@ -47,14 +54,15 @@ def composite_latest():
 
 @router.get("/composite/history")
 def composite_history(
+    asset: str = Query("gold"),
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
 ):
     """Historical composite scores."""
     conn = _get_conn()
     try:
-        query = "SELECT * FROM daily_composite WHERE 1=1"
-        params: list = []
+        query = "SELECT * FROM daily_composite WHERE asset = ?"
+        params: list = [asset]
         if start_date:
             query += " AND date >= ?"
             params.append(start_date)
@@ -75,20 +83,20 @@ def composite_history(
 
 
 @router.get("/drivers/latest")
-def drivers_latest():
+def drivers_latest(asset: str = Query("gold")):
     """Latest driver scores (sentiment + macro per driver)."""
     conn = _get_conn()
     try:
-        # Get the latest date with driver scores
         date_row = conn.execute(
-            "SELECT MAX(date) as max_date FROM driver_scores"
+            "SELECT MAX(date) as max_date FROM driver_scores WHERE asset = ?",
+            (asset,),
         ).fetchone()
         if not date_row or not date_row["max_date"]:
             return {"data": [], "date": None}
         latest_date = date_row["max_date"]
         rows = conn.execute(
-            "SELECT * FROM driver_scores WHERE date = ? ORDER BY driver",
-            (latest_date,),
+            "SELECT * FROM driver_scores WHERE date = ? AND asset = ? ORDER BY driver",
+            (latest_date, asset),
         ).fetchall()
         return {"data": _rows_to_dicts(rows), "date": latest_date}
     finally:
@@ -97,14 +105,15 @@ def drivers_latest():
 
 @router.get("/drivers/history")
 def drivers_history(
+    asset: str = Query("gold"),
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
 ):
     """Historical driver scores."""
     conn = _get_conn()
     try:
-        query = "SELECT * FROM driver_scores WHERE 1=1"
-        params: list = []
+        query = "SELECT * FROM driver_scores WHERE asset = ?"
+        params: list = [asset]
         if start_date:
             query += " AND date >= ?"
             params.append(start_date)
@@ -120,6 +129,7 @@ def drivers_history(
 
 @router.get("/signals")
 def signals(
+    asset: str = Query("gold"),
     driver: Optional[str] = Query(None),
     layer: Optional[str] = Query(None),
     source: Optional[str] = Query(None),
@@ -131,8 +141,8 @@ def signals(
     """Raw signals with filtering and pagination."""
     conn = _get_conn()
     try:
-        where = "WHERE 1=1"
-        params: list = []
+        where = "WHERE asset = ?"
+        params: list = [asset]
         if driver:
             where += " AND driver = ?"
             params.append(driver)
@@ -175,8 +185,11 @@ def signals(
 
 
 @router.post("/pipeline/run")
-def pipeline_run(target_date: Optional[str] = Query(None)):
-    """Trigger the pipeline for a given date (default: today)."""
+def pipeline_run(
+    asset: str = Query("gold"),
+    target_date: Optional[str] = Query(None),
+):
+    """Trigger the pipeline for a given date and asset (default: today, gold)."""
     if _pipeline_status["running"]:
         return {"status": "already_running"}
 
@@ -187,9 +200,10 @@ def pipeline_run(target_date: Optional[str] = Query(None)):
         _pipeline_status["last_error"] = None
         try:
             from main import run_pipeline
-            result = run_pipeline(td)
+            result = run_pipeline(td, asset=asset)
             _pipeline_status["last_result"] = {
                 "date": result["date"],
+                "asset": result["asset"],
                 "composite_score": result["composite"]["composite_score"],
                 "label": result["composite"]["label"],
             }
@@ -199,7 +213,7 @@ def pipeline_run(target_date: Optional[str] = Query(None)):
             _pipeline_status["running"] = False
 
     threading.Thread(target=_run, daemon=True).start()
-    return {"status": "started", "date": td.isoformat()}
+    return {"status": "started", "date": td.isoformat(), "asset": asset}
 
 
 @router.get("/pipeline/status")
@@ -209,37 +223,54 @@ def pipeline_status():
 
 
 @router.get("/config")
-def config():
-    """Driver weights, layer weights, driver names."""
-    return {
-        "driver_weights": DRIVER_WEIGHTS,
-        "layer_weights": LAYER_WEIGHTS,
-        "driver_names": DRIVER_NAMES,
-    }
+def config(asset: str = Query("gold")):
+    """Driver weights, layer weights, driver names for a specific asset."""
+    try:
+        asset_config = get_asset_config(asset)
+        return {
+            "driver_weights": asset_config.get("driver_weights", {}),
+            "layer_weights": asset_config.get("layer_weights", {}),
+            "driver_names": asset_config.get("driver_names", []),
+            "display_name": asset_config.get("display_name", asset),
+            "category": asset_config.get("category", "other"),
+        }
+    except ValueError:
+        return {
+            "driver_weights": {},
+            "layer_weights": {},
+            "driver_names": [],
+            "display_name": asset,
+            "category": "other",
+        }
 
 
 @router.get("/stats")
-def stats():
-    """Summary statistics."""
+def stats(asset: str = Query("gold")):
+    """Summary statistics for a specific asset."""
     conn = _get_conn()
     try:
         composite_stats = conn.execute(
             "SELECT COUNT(*) as total_dates, MIN(date) as min_date, "
-            "MAX(date) as max_date FROM daily_composite"
+            "MAX(date) as max_date FROM daily_composite WHERE asset = ?",
+            (asset,),
         ).fetchone()
         signal_count = conn.execute(
-            "SELECT COUNT(*) as count FROM raw_signals"
+            "SELECT COUNT(*) as count FROM raw_signals WHERE asset = ?",
+            (asset,),
         ).fetchone()
 
         # Get distinct sources and drivers for filter dropdowns
         sources = conn.execute(
-            "SELECT DISTINCT source FROM raw_signals ORDER BY source"
+            "SELECT DISTINCT source FROM raw_signals WHERE asset = ? ORDER BY source",
+            (asset,),
         ).fetchall()
         drivers = conn.execute(
-            "SELECT DISTINCT driver FROM raw_signals ORDER BY driver"
+            "SELECT DISTINCT driver FROM raw_signals WHERE asset = ? ORDER BY driver",
+            (asset,),
         ).fetchall()
         layers = conn.execute(
-            "SELECT DISTINCT layer FROM raw_signals ORDER BY layer"
+            "SELECT DISTINCT layer FROM raw_signals WHERE asset = ? ORDER BY layer",
+            (asset,),
         ).fetchall()
 
         return {

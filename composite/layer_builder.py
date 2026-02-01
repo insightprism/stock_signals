@@ -3,7 +3,6 @@
 import logging
 from typing import Dict, Optional
 
-from config.drivers import DRIVER_NAMES
 from config.settings import DRIVER_WEIGHTS
 
 logger = logging.getLogger(__name__)
@@ -42,8 +41,8 @@ def build_layer_score(driver_scores: Dict[str, float],
         for d in available
     )
 
-    logger.info("Layer score: %.1f (from %d/%d drivers, weight coverage %.0f%%)",
-                weighted_sum, len(available), len(DRIVER_NAMES),
+    logger.info("Layer score: %.1f (from %d drivers, weight coverage %.0f%%)",
+                weighted_sum, len(available),
                 total_weight * 100)
 
     return float(weighted_sum)

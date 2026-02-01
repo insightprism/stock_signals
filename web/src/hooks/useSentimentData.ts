@@ -7,37 +7,46 @@ import {
   fetchSignals,
   fetchConfig,
   fetchStats,
+  fetchAssets,
 } from '../api/sentimentApi';
 
-export function useCompositeLatest() {
+export function useAssets() {
   return useQuery({
-    queryKey: ['composite', 'latest'],
-    queryFn: fetchCompositeLatest,
+    queryKey: ['assets'],
+    queryFn: fetchAssets,
+    staleTime: Infinity,
   });
 }
 
-export function useCompositeHistory(startDate?: string, endDate?: string) {
+export function useCompositeLatest(asset: string) {
   return useQuery({
-    queryKey: ['composite', 'history', startDate, endDate],
-    queryFn: () => fetchCompositeHistory(startDate, endDate),
+    queryKey: ['composite', 'latest', asset],
+    queryFn: () => fetchCompositeLatest(asset),
   });
 }
 
-export function useDriversLatest() {
+export function useCompositeHistory(asset: string, startDate?: string, endDate?: string) {
   return useQuery({
-    queryKey: ['drivers', 'latest'],
-    queryFn: fetchDriversLatest,
+    queryKey: ['composite', 'history', asset, startDate, endDate],
+    queryFn: () => fetchCompositeHistory(asset, startDate, endDate),
   });
 }
 
-export function useDriversHistory(startDate?: string, endDate?: string) {
+export function useDriversLatest(asset: string) {
   return useQuery({
-    queryKey: ['drivers', 'history', startDate, endDate],
-    queryFn: () => fetchDriversHistory(startDate, endDate),
+    queryKey: ['drivers', 'latest', asset],
+    queryFn: () => fetchDriversLatest(asset),
   });
 }
 
-export function useSignals(filters: {
+export function useDriversHistory(asset: string, startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ['drivers', 'history', asset, startDate, endDate],
+    queryFn: () => fetchDriversHistory(asset, startDate, endDate),
+  });
+}
+
+export function useSignals(asset: string, filters: {
   driver?: string;
   layer?: string;
   source?: string;
@@ -47,22 +56,22 @@ export function useSignals(filters: {
   page_size?: number;
 }) {
   return useQuery({
-    queryKey: ['signals', filters],
-    queryFn: () => fetchSignals(filters),
+    queryKey: ['signals', asset, filters],
+    queryFn: () => fetchSignals(asset, filters),
   });
 }
 
-export function useConfig() {
+export function useConfig(asset: string) {
   return useQuery({
-    queryKey: ['config'],
-    queryFn: fetchConfig,
+    queryKey: ['config', asset],
+    queryFn: () => fetchConfig(asset),
     staleTime: Infinity,
   });
 }
 
-export function useStats() {
+export function useStats(asset: string) {
   return useQuery({
-    queryKey: ['stats'],
-    queryFn: fetchStats,
+    queryKey: ['stats', asset],
+    queryFn: () => fetchStats(asset),
   });
 }

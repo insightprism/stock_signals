@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCompositeLatest, useDriversLatest, useConfig, useStats } from '../hooks/useSentimentData';
+import { useAsset } from '../context/AssetContext';
 import { runPipeline, fetchPipelineStatus } from '../api/sentimentApi';
 
 const DRIVER_LABELS: Record<string, string> = {
@@ -57,6 +58,7 @@ function ScoreBar({ score, label }: { score: number; label: string }) {
 
 function RunPipelineButton() {
   const queryClient = useQueryClient();
+  const { selectedAsset, currentAssetName } = useAsset();
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,7 +83,6 @@ function RunPipelineButton() {
   }, [queryClient]);
 
   useEffect(() => {
-    // Check if already running on mount
     fetchPipelineStatus().then(s => {
       if (s.running) {
         setRunning(true);
@@ -94,7 +95,7 @@ function RunPipelineButton() {
     setError(null);
     setRunning(true);
     try {
-      const res = await runPipeline();
+      const res = await runPipeline(selectedAsset);
       if (res.status === 'already_running') {
         // just poll
       }
@@ -118,7 +119,7 @@ function RunPipelineButton() {
             Pipeline Running...
           </span>
         ) : (
-          'Run Pipeline (Today)'
+          `Run Pipeline (${currentAssetName})`
         )}
       </button>
       {error && (
@@ -126,7 +127,7 @@ function RunPipelineButton() {
       )}
       {running && (
         <p className="text-sm text-gray-400">
-          Collecting signals and computing scores. This may take a few minutes.
+          Collecting signals and computing scores for {currentAssetName}.
         </p>
       )}
     </div>
@@ -134,10 +135,11 @@ function RunPipelineButton() {
 }
 
 export default function HomePage() {
-  const { data: composite, isLoading: compLoading } = useCompositeLatest();
-  const { data: driversData, isLoading: drvLoading } = useDriversLatest();
-  const { data: config } = useConfig();
-  const { data: stats } = useStats();
+  const { selectedAsset, currentAssetName } = useAsset();
+  const { data: composite, isLoading: compLoading } = useCompositeLatest(selectedAsset);
+  const { data: driversData, isLoading: drvLoading } = useDriversLatest(selectedAsset);
+  const { data: config } = useConfig(selectedAsset);
+  const { data: stats } = useStats(selectedAsset);
 
   if (compLoading || drvLoading) {
     return (
@@ -150,7 +152,7 @@ export default function HomePage() {
   if (!composite) {
     return (
       <div className="text-center py-20 text-gray-500">
-        <p className="text-xl font-medium mb-2">No data available yet</p>
+        <p className="text-xl font-medium mb-2">No data available for {currentAssetName}</p>
         <p className="mb-6">Run the pipeline to collect signals and generate composite scores.</p>
         <RunPipelineButton />
       </div>
@@ -158,6 +160,9 @@ export default function HomePage() {
   }
 
   const drivers = driversData?.data ?? [];
+  const layerWeights = config?.layer_weights ?? { sentiment: 0.4, macro: 0.6 };
+  const sentimentPct = Math.round((layerWeights.sentiment ?? 0.4) * 100);
+  const macroPct = Math.round((layerWeights.macro ?? 0.6) * 100);
 
   return (
     <div className="space-y-6">
@@ -175,13 +180,13 @@ export default function HomePage() {
             <p className="text-2xl font-medium mt-1">{composite.label}</p>
             <p className="text-white/70 text-sm mt-2">Date: {composite.date}</p>
           </div>
-          {composite.gold_price != null && (
+          {composite.asset_price != null && (
             <div className="text-right">
-              <p className="text-white/80 text-sm font-medium uppercase tracking-wider">Gold Price</p>
-              <p className="text-4xl font-bold mt-1">${composite.gold_price.toFixed(2)}</p>
-              {composite.gold_return != null && (
-                <p className={`text-lg font-medium mt-1 ${composite.gold_return >= 0 ? 'text-green-200' : 'text-red-200'}`}>
-                  {composite.gold_return >= 0 ? '+' : ''}{(composite.gold_return * 100).toFixed(2)}%
+              <p className="text-white/80 text-sm font-medium uppercase tracking-wider">{currentAssetName} Price</p>
+              <p className="text-4xl font-bold mt-1">${composite.asset_price.toFixed(2)}</p>
+              {composite.asset_return != null && (
+                <p className={`text-lg font-medium mt-1 ${composite.asset_return >= 0 ? 'text-green-200' : 'text-red-200'}`}>
+                  {composite.asset_return >= 0 ? '+' : ''}{(composite.asset_return * 100).toFixed(2)}%
                 </p>
               )}
             </div>
@@ -193,8 +198,8 @@ export default function HomePage() {
       <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
         <h2 className="text-lg font-semibold text-gray-800 mb-4">Layer Scores</h2>
         <div className="space-y-3">
-          <ScoreBar score={composite.sentiment_layer} label="Sentiment (40%)" />
-          <ScoreBar score={composite.macro_layer} label="Macro (60%)" />
+          <ScoreBar score={composite.sentiment_layer} label={`Sentiment (${sentimentPct}%)`} />
+          <ScoreBar score={composite.macro_layer} label={`Macro (${macroPct}%)`} />
         </div>
       </div>
 
@@ -249,11 +254,11 @@ export default function HomePage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Link to="/history" className="bg-white rounded-xl p-5 shadow-sm border border-gray-200 hover:border-amber-300 hover:shadow-md transition-all">
           <h3 className="font-semibold text-gray-800">History</h3>
-          <p className="text-sm text-gray-500 mt-1">View composite score time series and gold price chart</p>
+          <p className="text-sm text-gray-500 mt-1">View composite score time series and price chart</p>
         </Link>
         <Link to="/drivers" className="bg-white rounded-xl p-5 shadow-sm border border-gray-200 hover:border-amber-300 hover:shadow-md transition-all">
           <h3 className="font-semibold text-gray-800">Drivers</h3>
-          <p className="text-sm text-gray-500 mt-1">Detailed breakdown of all 7 sentiment drivers</p>
+          <p className="text-sm text-gray-500 mt-1">Detailed breakdown of all sentiment drivers</p>
         </Link>
         <Link to="/signals" className="bg-white rounded-xl p-5 shadow-sm border border-gray-200 hover:border-amber-300 hover:shadow-md transition-all">
           <h3 className="font-semibold text-gray-800">Signals</h3>

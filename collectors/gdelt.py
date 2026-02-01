@@ -5,7 +5,6 @@ from datetime import date
 from typing import Dict, List, Optional
 
 from collectors.base import BaseCollector
-from config.drivers import DRIVER_KEYWORDS
 from config.settings import GDELT_BASE_URL, GDELT_TIMESPAN
 
 logger = logging.getLogger(__name__)
@@ -72,11 +71,13 @@ class GdeltCollector(BaseCollector):
             logger.error("GDELT article count failed: %s", e)
             return None
 
-    def collect(self, target_date: date, drivers: Optional[List[str]] = None
+    def collect(self, target_date: date, asset_config: dict,
+                drivers: Optional[List[str]] = None
                 ) -> Dict[str, List[dict]]:
         results: Dict[str, List[dict]] = {}
+        all_keywords = asset_config.get("keywords", {})
 
-        for driver, keywords in DRIVER_KEYWORDS.items():
+        for driver, keywords in all_keywords.items():
             if drivers and driver not in drivers:
                 continue
             # Skip positioning — not a text-based signal

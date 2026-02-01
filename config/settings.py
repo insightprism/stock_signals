@@ -9,6 +9,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 DATA_DIR.mkdir(exist_ok=True)
 DB_PATH = os.getenv("DB_PATH", str(DATA_DIR / "gold_sentiment.db"))
+ASSETS_DIR = PROJECT_ROOT / "config" / "assets"
 
 # --- API Keys ---
 FRED_API_KEY = os.getenv("FRED_API_KEY", "")

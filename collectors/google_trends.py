@@ -6,7 +6,6 @@ from datetime import date, timedelta
 from typing import Dict, List, Optional
 
 from collectors.base import BaseCollector
-from config.drivers import DRIVER_TRENDS_QUERIES
 
 logger = logging.getLogger(__name__)
 
@@ -56,11 +55,13 @@ class GoogleTrendsCollector(BaseCollector):
             logger.error("pytrends fetch failed for %s: %s", keywords, e)
             return None
 
-    def collect(self, target_date: date, drivers: Optional[List[str]] = None
+    def collect(self, target_date: date, asset_config: dict,
+                drivers: Optional[List[str]] = None
                 ) -> Dict[str, List[dict]]:
         results: Dict[str, List[dict]] = {}
+        trends_queries = asset_config.get("trends_queries", {})
 
-        for driver, keywords in DRIVER_TRENDS_QUERIES.items():
+        for driver, keywords in trends_queries.items():
             if drivers and driver not in drivers:
                 continue
 

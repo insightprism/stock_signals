@@ -1,10 +1,13 @@
 import { useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { routes } from '../config/routeConfig';
+import { AssetSelector } from './AssetSelector';
+import { useAsset } from '../context/AssetContext';
 
 export function Layout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { currentAssetName } = useAsset();
 
   const currentRoute = routes.find(r => r.path === location.pathname);
 
@@ -14,9 +17,12 @@ export function Layout({ children }: { children: ReactNode }) {
       <header className="bg-amber-700 text-white shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <Link to="/" className="flex items-center space-x-2">
-              <span className="text-xl font-bold tracking-tight">Gold Sentiment Index</span>
-            </Link>
+            <div className="flex items-center gap-4">
+              <Link to="/" className="flex items-center space-x-2">
+                <span className="text-xl font-bold tracking-tight">Commodity Sentiment Index</span>
+              </Link>
+              <AssetSelector />
+            </div>
 
             {/* Desktop nav */}
             <nav className="hidden md:flex space-x-1">
@@ -78,7 +84,9 @@ export function Layout({ children }: { children: ReactNode }) {
       {currentRoute && (
         <div className="bg-white border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-            <h1 className="text-lg font-semibold text-gray-800">{currentRoute.label}</h1>
+            <h1 className="text-lg font-semibold text-gray-800">
+              {currentAssetName} &mdash; {currentRoute.label}
+            </h1>
           </div>
         </div>
       )}
@@ -90,7 +98,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
       {/* Footer */}
       <footer className="bg-gray-800 text-gray-400 text-center py-4 text-sm">
-        Gold Sentiment Index &mdash; Daily composite scoring across 7 drivers
+        Commodity Sentiment Index &mdash; Multi-asset composite scoring
       </footer>
     </div>
   );

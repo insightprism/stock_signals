@@ -48,9 +48,15 @@ class BaseCollector(ABC):
         raise last_exc
 
     @abstractmethod
-    def collect(self, target_date: date, drivers: Optional[List[str]] = None
+    def collect(self, target_date: date, asset_config: dict,
+                drivers: Optional[List[str]] = None
                 ) -> Dict[str, List[dict]]:
-        """Collect data for the given date.
+        """Collect data for the given date and asset.
+
+        Args:
+            target_date: Date to collect data for
+            asset_config: Asset configuration dict from asset_registry
+            drivers: Optional list of driver names to collect for
 
         Returns a dict keyed by driver name, each value is a list of signal dicts:
             {

@@ -15,3 +15,4 @@ pytest
 vaderSentiment
 fastapi
 uvicorn[standard]
+pyyaml

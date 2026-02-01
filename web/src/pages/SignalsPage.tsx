@@ -8,10 +8,12 @@ import {
   type SortingState,
 } from '@tanstack/react-table';
 import { useSignals, useStats } from '../hooks/useSentimentData';
+import { useAsset } from '../context/AssetContext';
 import type { RawSignal } from '../api/sentimentApi';
 
 export default function SignalsPage() {
-  const { data: stats } = useStats();
+  const { selectedAsset } = useAsset();
+  const { data: stats } = useStats(selectedAsset);
 
   const [driver, setDriver] = useState('');
   const [layer, setLayer] = useState('');
@@ -31,7 +33,7 @@ export default function SignalsPage() {
     page_size: 50,
   }), [driver, layer, source, startDate, endDate, page]);
 
-  const { data: result, isLoading } = useSignals(filters);
+  const { data: result, isLoading } = useSignals(selectedAsset, filters);
 
   const columns = useMemo<ColumnDef<RawSignal>[]>(() => [
     { accessorKey: 'date', header: 'Date', size: 110 },
