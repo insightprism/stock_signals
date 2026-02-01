@@ -1,0 +1,17 @@
+pandas
+numpy
+requests
+yfinance
+pytrends
+praw
+fredapi
+cot-reports
+nltk
+python-dotenv
+matplotlib
+plotly
+tqdm
+pytest
+vaderSentiment
+fastapi
+uvicorn[standard]
